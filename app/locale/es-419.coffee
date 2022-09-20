@@ -287,8 +287,8 @@ module.exports = nativeDescription: "Español (América Latina)", englishDescrip
     for_educators: "Para Maestros"
     for_parents: "Para Padres"
     for_everyone: "Para Todos"
-#    for_students: "For Students"
-#    for_individuals: "For Individuals"
+    for_students: "Para Estudiantes" #{change}
+    for_individuals: "Para una Persona" #{change}
     what_our_customers_are_saying: "Lo que nuestros clientes están diciendo"
     game_based_learning: "Aprendizaje basado en juegos"
     unique_approach_blurb: "Con nuestro enfoque único, los estudiantes adoptan el aprendizaje mientras juegan y escriben código desde el comienzo de su aventura, promoviendo el aprendizaje activo y una mentalidad de crecimiento."
@@ -575,7 +575,7 @@ module.exports = nativeDescription: "Español (América Latina)", englishDescrip
     birthday: "Cumpleaños"
     parent_email_blurb: "Nosotros sabemos que tu no puedes esperar para aprender programación &mdash; nosotros tambien estamos emocionados! Tus padres recibirán un correo electrónico con más instrucciones sobre cómo crear una cuenta para ti. Envíe un correo electrónico a {{email_link}} si tienes alguna pregunta"
     classroom_not_found: "Ninguna clase existe con este código de clase. Revisa tu ortografía o pidele ayuda a tu maestro."
-#    activation_code_used: "The activation code has been used. Check your spelling or ask your teacher for help."
+    activation_code_used: "El código de activación fue usado. Revisa tu ortografía o pidele ayuda a tu maestro." #{change]
     checking: "Comprobando..."
     account_exists: "Este email ya esta en uso:"
     sign_in: "Iniciar Sesión"
@@ -612,7 +612,7 @@ module.exports = nativeDescription: "Español (América Latina)", englishDescrip
     account_created: "¡Cuenta Creada!"
     confirm_student_blurb: "Escribe tu información para que no la olvides. Tu maestro también puede ayudarte a restablecer tu contraseña en cualquier momento."
     confirm_individual_blurb: "Escribe tu información de inicio de sesión en caso de que la necesites más adelante. Verifica tu correo electrónico para que puedas recuperar tu cuenta si alguna vez olvidas la contraseña. ¡Revisa tu bandeja de entrada!"
-#    confirm_individual_blurb_without_email: "Write down your login information in case you need it later."
+    confirm_individual_blurb_without_email: "Escribe abajo tu información de inicio de sesión en caso de que la necesites más tarde." # {change}
     write_this_down: "Escribe esto:" # {change}
     start_playing: "¡Empieza a jugar!"
     sso_connected: "Conectado exitosamente con:"
@@ -789,7 +789,7 @@ module.exports = nativeDescription: "Español (América Latina)", englishDescrip
     email_us: "Envíanos un correo electrónico"
     sales: "Ventas"
     support: "Ayuda"
-#    here: "here"
+    here: "Aquí" # {change}
 
   units:
     second: "segundo"
@@ -817,7 +817,7 @@ module.exports = nativeDescription: "Español (América Latina)", englishDescrip
     finished_hoc: "He terminado con mi Hora of Código"
     get_certificate: "¡Obtén tu certificado!"
     level_complete: "Nivel completo"
-#    level_complete_at: "Level Completed "
+    level_complete_at: "Nivel Compleado " # {change}
     completed_level: "Nivel Completado:"
     course: "Curso:"
     done: "Listo"
