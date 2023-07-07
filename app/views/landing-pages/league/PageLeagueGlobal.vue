@@ -597,11 +597,11 @@ export default {
       </div>
       <div class="col-lg-6 section-space" style="text-align: left;">
         <div>
-          <img class="img-responsive" src="/images/pages/league/lava-lake-clash.png" loading="lazy" style="max-height: 200px; float: right; margin: 0 15px 15px;"/>
-          <h1 class="subheader1" style="margin-bottom: 32px;"><span class="esports-green">Season 6 </span><span class="esports-aqua">Final </span><span class="esports-aqua">Arena </span><span class="esports-pink">Now </span><span class="esports-purple">Live!</span></h1>
+          <img class="img-responsive" src="/images/pages/league/equinox-cup.png" loading="lazy" style="max-height: 200px; float: right; margin: 0 15px 15px;"/>
+          <h1 class="subheader1" style="margin-bottom: 32px;"><span class="esports-green">Season 7 </span><span class="esports-aqua">Final </span><span class="esports-aqua">Arena </span><span class="esports-pink">Now </span><span class="esports-purple">Live!</span></h1>
         </div>
-        <p>{{ $t('league.season6_announcement_1') }}</p>
-        <p>{{ $t('league.season6_announcement_2') }}</p>
+        <p>{{ $t('league.season7_announcement_1') }}</p>
+        <p>{{ $t('league.season4_announcement_2') }}</p>
       </div>
     </div>
 
@@ -656,7 +656,7 @@ export default {
 
     <div class="row flex-row video-iframe-section section-space" style="margin: 0 0 0 0" v-if="previousChampionshipArenaResultsPublished">
       <div class="col-sm-10 video-backer video-iframe">
-        <div style="position: relative; padding-top: 56.14583333333333%;"><iframe src="https://iframe.videodelivery.net/6650f5c84f65ecd1709cca1210c4e9ab?poster=https://videodelivery.net/6650f5c84f65ecd1709cca1210c4e9ab/thumbnails/thumbnail.jpg%3Ftime%3D1762s" style="border: none; position: absolute; top: 0; height: 100%; width: 100%;"  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowfullscreen="true" title="CodeCombat AI League Winners - Season 6 - Molten Mayhem"></iframe></div>
+        <div style="position: relative; padding-top: 56.14583333333333%;"><iframe src="https://iframe.videodelivery.net/4832912db10162e24cb2eb86df6c36d7?poster=https://videodelivery.net/4832912db10162e24cb2eb86df6c36d7/thumbnails/thumbnail.jpg%3Ftime%3D1021s" style="border: none; position: absolute; top: 0; height: 100%; width: 100%;"  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowfullscreen="true" title="CodeCombat AI League Winners - Season 7 - Melting Point"></iframe></div>
       </div>
     </div>
 

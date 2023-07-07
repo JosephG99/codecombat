@@ -19,6 +19,8 @@ TokenIterator = ace.require('ace/token_iterator').TokenIterator
 LZString = require 'lz-string'
 utils = require 'core/utils'
 Aether = require 'lib/aether/aether'
+AceDiff = require 'ace-diff'
+require('app/styles/play/level/tome/ace-diff-spell.sass')
 
 module.exports = class SpellView extends CocoView
   id: 'spell-view'
@@ -62,6 +64,12 @@ module.exports = class SpellView extends CocoView
     'level:contact-button-pressed': 'onContactButtonPressed'
     'level:show-victory': 'onShowVictory'
     'web-dev:error': 'onWebDevError'
+    'level:gather-chat-message-context': 'onGatherChatMessageContext'
+    'tome:fix-code': 'onFixCode'
+    'level:update-solution': 'onUpdateSolution'
+    'level:toggle-solution': 'onToggleSolution'
+    'level:close-solution': 'closeSolution'
+    'level:streaming-solution': 'onStreamingSolution'
 
   events:
     'mouseout': 'onMouseOut'
@@ -78,6 +86,7 @@ module.exports = class SpellView extends CocoView
     @highlightCurrentLine = _.throttle @highlightCurrentLine, 100
     $(window).on 'resize', @onWindowResize
     @observing = @session.get('creator') isnt me.id
+    @spectateView = options.spectateView
     @loadedToken = {}
     @addUserSnippets = _.debounce @reallyAddUserSnippets, 500, {maxWait: 1500, leading: true, trailing: false}
 
@@ -86,6 +95,8 @@ module.exports = class SpellView extends CocoView
     @createACE()
     @createACEShortcuts()
     @hookACECustomBehavior()
+    if (me.isAdmin() or utils.getQueryVariable 'ai') and not @spectateView
+      @fillACESolution()
     @fillACE()
     @createOnCodeChangeHandlers()
     @lockDefaultCode()
@@ -137,6 +148,7 @@ module.exports = class SpellView extends CocoView
     # Create a Spade to 'dig' into Ace.
     @spade = new Spade()
     @spade.track(@ace)
+    @spade.createUIEvent "spade-created"
     # If a user is taking longer than 10 minutes, let's log it.
     saveSpadeDelay = 10 * 60 * 1000
     if @options.level.get('releasePhase') is 'beta'
@@ -669,6 +681,48 @@ module.exports = class SpellView extends CocoView
     return if @destroyed or @aceDoc.undergoingFirepadOperation  # from my Firepad ACE adapter
     Backbone.Mediator.publish 'tome:editing-began', {}
 
+  updateSolutionLines: (screenLineCount, ace, aceCls, areaId) =>
+    # wrap the updateAceLine to avoid throttle mess up different params(aceCls)
+    @updateAceLines(screenLineCount, ace, aceCls, areaId)
+
+  updateAceLines: (screenLineCount, ace=@ace, aceCls='.ace', areaId='#code-area') =>
+    lineHeight = ace.renderer.lineHeight or 20
+    spellPaletteView = $('#tome-view #spell-palette-view-bot')
+    spellTopBarHeight = $('#spell-top-bar-view').outerHeight()
+    if aceCls == '.ace'
+      spellPaletteHeight = spellPaletteView.outerHeight()
+    else
+      spellPaletteHeight = 0
+    windowHeight = $(window).innerHeight()
+    spellPaletteAllowedHeight = Math.min spellPaletteHeight, windowHeight / 2
+    topOffset = $(aceCls).offset().top
+    gameHeight = $('#game-area').innerHeight()
+    heightScale = if aceCls == '.ace' then 1 else 0.5
+
+    # If the spell palette is too tall, we'll need to shrink it.
+    maxHeightOffset = 75
+    minHeightOffset = 175
+    maxHeight = Math.min(windowHeight, Math.max(windowHeight, 600)) - topOffset - spellPaletteAllowedHeight - maxHeightOffset
+    minHeight = Math.min maxHeight * heightScale, Math.min(gameHeight, Math.max(windowHeight, 600)) - spellPaletteHeight - minHeightOffset
+
+    spellPalettePosition = if spellPaletteHeight > 0 then 'bot' else 'mid'
+    minLinesBuffer = if spellPalettePosition is 'bot' then 0 else 2
+    linesAtMinHeight = Math.max(8, Math.floor(minHeight / lineHeight - minLinesBuffer))
+    linesAtMaxHeight = Math.floor(maxHeight / lineHeight)
+    lines = Math.max linesAtMinHeight, Math.min(screenLineCount + 2, linesAtMaxHeight), 8
+    lines = 8 if _.isNaN lines
+
+    ace.setOptions minLines: lines, maxLines: lines
+
+    # If bot: move spell palette up, slightly overlapping us.
+    newTop = 185 + lineHeight * lines
+    if aceCls == '.ace'
+      spellPaletteView.css('top', newTop)
+
+      codeAreaBottom = if spellPaletteHeight then windowHeight - (newTop + spellPaletteHeight + 20) else 0
+      $(areaId).css('bottom', codeAreaBottom)
+    #console.log { lineHeight, spellTopBarHeight, spellPaletteHeight, spellPaletteAllowedHeight, windowHeight, topOffset, gameHeight, minHeight, maxHeight, linesAtMinHeight, linesAtMaxHeight, lines, newTop, screenLineCount }
+
   updateLines: =>
     # Make sure there are always blank lines for the player to type on, and that the editor resizes to the height of the lines.
     return if @destroyed
@@ -686,36 +740,7 @@ module.exports = class SpellView extends CocoView
     screenLineCount = @aceSession.getScreenLength()
     if screenLineCount isnt @lastScreenLineCount
       @lastScreenLineCount = screenLineCount
-      lineHeight = @ace.renderer.lineHeight or 20
-      spellPaletteView = $('#tome-view #spell-palette-view-bot')
-      spellTopBarHeight = $('#spell-top-bar-view').outerHeight()
-      spellPaletteHeight = spellPaletteView.outerHeight()
-      windowHeight = $(window).innerHeight()
-      spellPaletteAllowedHeight = Math.min spellPaletteHeight, windowHeight / 2
-      topOffset = @$el.find('.ace').offset().top
-      gameHeight = $('#game-area').innerHeight()
-
-      # If the spell palette is too tall, we'll need to shrink it.
-      maxHeightOffset = 75
-      minHeightOffset = 175
-      maxHeight = Math.min(windowHeight, Math.max(windowHeight, 600)) - topOffset - spellPaletteAllowedHeight - maxHeightOffset
-      minHeight = Math.min maxHeight, Math.min(gameHeight, Math.max(windowHeight, 600)) - spellPaletteHeight - minHeightOffset
-
-      spellPalettePosition = if spellPaletteHeight > 0 then 'bot' else 'mid'
-      minLinesBuffer = if spellPalettePosition is 'bot' then 0 else 2
-      linesAtMinHeight = Math.max(8, Math.floor(minHeight / lineHeight - minLinesBuffer))
-      linesAtMaxHeight = Math.floor(maxHeight / lineHeight)
-      lines = Math.max linesAtMinHeight, Math.min(screenLineCount + 2, linesAtMaxHeight), 8
-      lines = 8 if _.isNaN lines
-      @ace.setOptions minLines: lines, maxLines: lines
-
-      # If bot: move spell palette up, slightly overlapping us.
-      newTop = 185 + lineHeight * lines
-      spellPaletteView.css('top', newTop)
-
-      codeAreaBottom = if spellPaletteHeight then windowHeight - (newTop + spellPaletteHeight + 20) else 0
-      $('#code-area').css('bottom', codeAreaBottom)
-      #console.log { lineHeight, spellTopBarHeight, spellPaletteHeight, spellPaletteAllowedHeight, windowHeight, topOffset, gameHeight, minHeight, maxHeight, linesAtMinHeight, linesAtMaxHeight, lines, newTop, screenLineCount }
+      @updateAceLines(screenLineCount)
 
     if @firstEntryToScrollLine? and @ace?.renderer?.$cursorLayer?.config
       @ace.scrollToLine @firstEntryToScrollLine, true, true
@@ -727,14 +752,15 @@ module.exports = class SpellView extends CocoView
 
   saveSpade: =>
     return if @destroyed or not @spade
+    @spade.createUIEvent "saving-spade"
     spadeEvents = @spade.compile()
-    # Uncomment the below line for a debug panel to display inside the level
-    #@spade.debugPlay(spadeEvents)
     condensedEvents = @spade.condense(spadeEvents)
+    # Uncomment the below lines for a debug panel to display inside the level
+    # uncondensedEvents = @spade.expand(condensedEvents)
+    # @spade.debugPlay(uncondensedEvents)
 
     return unless condensedEvents.length
     compressedEvents = LZString.compressToUTF16(JSON.stringify(condensedEvents))
-
     codeLog = new CodeLog({
       sessionID: @options.session.id
       level:
@@ -748,6 +774,8 @@ module.exports = class SpellView extends CocoView
     codeLog.save()
 
   onShowVictory: (e) ->
+    if @spade?
+      @spade.createUIEvent "victory-shown"
     if @saveSpadeTimeout?
       window.clearTimeout @saveSpadeTimeout
       @saveSpadeTimeout = null
@@ -757,6 +785,8 @@ module.exports = class SpellView extends CocoView
         @saveSpade()
 
   onManualCast: (e) ->
+    if @spade?
+      @spade.createUIEvent "code-run"
     cast = @$el.parent().length
     @recompile cast, e.realTime, false
     @focus() if cast
@@ -775,6 +805,8 @@ module.exports = class SpellView extends CocoView
     @hasSetInitialCursor = false
     @highlightCurrentLine()
     @updateLines()
+    if @spade?
+      @spade.createUIEvent "code-reset"
 
   recompile: (cast=true, realTime=false, cinematic=false) ->
     @fetchTokenForSource().then (source) =>
@@ -960,6 +992,8 @@ module.exports = class SpellView extends CocoView
 
   # Tell ProblemAlertView to display this problem (only)
   displayProblemBanner: (problem) ->
+    if @spade?
+      @spade.createUIEvent "code-error"
     lineOffsetPx = 0
     if problem.row?
       for i in [0...problem.row]
@@ -1012,30 +1046,34 @@ module.exports = class SpellView extends CocoView
     @savedProblems[hashValue] = true
     sampleRate = Math.max(1, (me.level()-2) * 2) * 0.01 # Reduce number of errors reported on earlier levels
     return unless Math.random() < sampleRate
-
     # Save new problem
-    @userCodeProblem = new UserCodeProblem()
-    @userCodeProblem.set 'code', aether.raw
+    ucp = @createUserCodeProblem aether, aetherProblem
+    ucp.save()
+    null
+
+  createUserCodeProblem: (aether, aetherProblem) ->
+    ucp = new UserCodeProblem()
+    ucp.set 'code', aether.raw
     if aetherProblem.range
       rawLines = aether.raw.split '\n'
       errorLines = rawLines.slice aetherProblem.range[0].row, aetherProblem.range[1].row + 1
-      @userCodeProblem.set 'codeSnippet', errorLines.join '\n'
-    @userCodeProblem.set 'errHint', aetherProblem.hint if aetherProblem.hint
-    @userCodeProblem.set 'errId', aetherProblem.id if aetherProblem.id
-    @userCodeProblem.set 'errLevel', aetherProblem.level if aetherProblem.level
+      ucp.set 'codeSnippet', errorLines.join '\n'
+    ucp.set 'errHint', aetherProblem.hint if aetherProblem.hint
+    ucp.set 'errId', aetherProblem.id if aetherProblem.id
+    ucp.set 'errCode', aetherProblem.errorCode if aetherProblem.errorCode
+    ucp.set 'errLevel', aetherProblem.level if aetherProblem.level
     if aetherProblem.message
-      @userCodeProblem.set 'errMessage', aetherProblem.message
+      ucp.set 'errMessage', aetherProblem.message
       # Save error message without 'Line N: ' prefix
       messageNoLineInfo = aetherProblem.message
       if lineInfoMatch = messageNoLineInfo.match /^Line [0-9]+\: /
         messageNoLineInfo = messageNoLineInfo.slice(lineInfoMatch[0].length)
-      @userCodeProblem.set 'errMessageNoLineInfo', messageNoLineInfo
-    @userCodeProblem.set 'errRange', aetherProblem.range if aetherProblem.range
-    @userCodeProblem.set 'errType', aetherProblem.type if aetherProblem.type
-    @userCodeProblem.set 'language', aether.language.id if aether.language?.id
-    @userCodeProblem.set 'levelID', @options.levelID if @options.levelID
-    @userCodeProblem.save()
-    null
+      ucp.set 'errMessageNoLineInfo', messageNoLineInfo
+    ucp.set 'errRange', aetherProblem.range if aetherProblem.range
+    ucp.set 'errType', aetherProblem.type if aetherProblem.type
+    ucp.set 'language', aether.language.id if aether.language?.id
+    ucp.set 'levelID', @options.levelID if @options.levelID
+    ucp
 
   # Autocast (preload the world in the background):
   # Goes immediately if the code is a) changed and b) complete/valid and c) the cursor is at beginning or end of a line
@@ -1400,6 +1438,94 @@ module.exports = class SpellView extends CocoView
     pretty = @spellThang.aether.beautify(ugly.replace /\bloop\b/g, 'while (__COCO_LOOP_CONSTRUCT__)').replace /while \(__COCO_LOOP_CONSTRUCT__\)/g, 'loop'
     @ace.setValue pretty
 
+  onFixCode: (e) ->
+    @ace.setValue e.code
+    @ace.clearSelection()
+    @recompile()
+
+  onFixCodePreviewStart: (e) ->
+    # TODO: show a diff view instead of just setting the code
+    @codeBeforePreview = @getSource()
+    @updateACEText e.code
+    @ace.clearSelection()
+
+  onFixCodePreviewEnd: (e) ->
+    @updateACEText @codeBeforePreview
+    @ace.clearSelection()
+
+  fillACESolution: ->
+    @aceSolution = ace.edit document.querySelector('.ace-solution')
+    aceSSession = @aceSolution.getSession()
+    aceSSession.setMode aceUtils.aceEditModes[@spell.language]
+    @aceSolution.setTheme 'ace/theme/textmate'
+    # solution = store.getters['game/getSolutionSrc'](@spell.language)
+    @aceSolution.setValue ''
+    @aceSolution.clearSelection()
+    @aceSolutionLastLineCount = 0
+    @updateSolutionLines = _.throttle @updateSolutionLines, 1000
+
+    @aceDiff = new AceDiff({
+      element: '#solution-view'
+      showDiffs: false,
+      showConnectors: true,
+      mode: aceUtils.aceEditModes[@spell.language],
+      left: {
+        ace: @aceSolution,
+        editable: false,
+        copyLinkEnabled: false
+      },
+      right: {
+        ace: @ace,
+        copyLinkEnabled: false
+      }
+    })
+
+    aceSSession.on('changeBackMarker', =>
+      if @aceDiff and @aceDiff.getNumDiffs() == 0
+        @closeSolution()
+    )
+
+  onUpdateSolution: (e)->
+    return unless @aceDiff
+    @aceSolution.setValue e.code
+    @aceSolution.clearSelection()
+    lineCount = e.code.split('\n').length
+    # if lineCount > @aceSolutionLastLineCount
+      # @aceSolutionLastLineCount = lineCount
+    @updateSolutionLines(lineCount, @aceSolution, '.ace-solution', '#solution-area')
+    @aceSolution.resize(true)
+
+  onStreamingSolution: (e) ->
+    if e.finish
+      @solutionStreaming = false
+    else
+      @solutionStreaming = true
+    solution = document.querySelector('#solution-area')
+    if solution.classList.contains('display')
+      @aceDiff.setOptions({showDiffs: e.finish?})
+
+  onToggleSolution: (e)->
+    return unless @aceDiff
+    if e.code
+      @onUpdateSolution(e)
+    solution = document.querySelector('#solution-area')
+    if solution.classList.contains('display')
+      solution.classList.remove('display')
+    else
+      solution.classList.add('display')
+      solution.style.opacity = 1
+    return if @solutionStreaming
+    @aceDiff.setOptions showDiffs: solution.classList.contains('display')
+
+  closeSolution: ->
+    solution = document.querySelector('#solution-area')
+    if solution.classList.contains('display')
+      solution.classList.remove('display')
+      @aceDiff.setOptions({showDiffs: false})
+      setTimeout(() =>
+        solution.style.opacity = 0
+      , 1000)
+
   onMaximizeToggled: (e) ->
     _.delay (=> @resize()), 500 + 100  # Wait $level-resize-transition-time, plus a bit.
 
@@ -1446,6 +1572,40 @@ module.exports = class SpellView extends CocoView
   onPlaybackEndedChanged: (e) ->
     $(@ace?.container).toggleClass 'playback-ended', e.ended
 
+  onGatherChatMessageContext: (e) ->
+    context = e.chat.context
+    context.codeLanguage = @spell.language or 'python'
+    if level = @options.level
+      context.levelOriginal = level.get('original')
+      context.levelName = level.get('displayName') or level.get('name')
+      if e.chat.example
+        context.i18n ?= {}
+        for language, translations of level.get('i18n')
+          if levelNameTranslation = translations.name
+            context.i18n[language] ?= {}
+            context.i18n[language].levelName = levelNameTranslation
+
+    aether = @displayedAether  # TODO: maybe use @spellThang.aether?
+    isCast = @displayedAether is @spellThang.aether or not _.isEmpty(aether.metrics) or _.some aether.getAllProblems(), {type: 'runtime'}
+    newProblems = @convertAetherProblems(aether, aether.getAllProblems(), isCast)
+    if problem = newProblems[0]
+      ucp = @createUserCodeProblem aether, problem.aetherProblem
+      context.error = _.pick
+        codeSnippet: ucp.get 'codeSnippet'
+        hint: ucp.get 'errHint'
+        id: ucp.get 'errId'
+        errorCode: ucp.get 'errCode'
+        level: ucp.get 'errLevel'
+        message: ucp.get 'errMessage'
+        messageNoLineInfo: ucp.get 'errMessageNoLineInfo'
+        range: ucp.get 'errRange'
+        type: ucp.get 'errType'
+        i18nParams: problem.i18nParams
+      , (v) -> v isnt undefined
+
+    spellContext = @spell.createChatMessageContext e.chat
+    _.assign context, spellContext
+
   checkRequiredCode: =>
     return if @destroyed
     source = @getSource().replace @singleLineCommentRegex(), ''
@@ -1490,6 +1650,9 @@ module.exports = class SpellView extends CocoView
     @toolbarView?.destroy()
     @autocomplete?.addSnippets [], @editorLang if @editorLang?
     $(window).off 'resize', @onWindowResize
+    if @spade?
+      @spade.createUIEvent "destroying-view"
+    @saveSpade()
     window.clearTimeout @saveSpadeTimeout
     @saveSpadeTimeout = null
     @autocomplete?.destroy()

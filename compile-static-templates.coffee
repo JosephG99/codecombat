@@ -77,6 +77,7 @@ compile = (contents, locals, filename, cb) ->
     locals.me.useQiyukf = -> locals.chinaInfra ? false  # Netease Qiyu Live Chat Plugin
     locals.me.useDataDog = -> not (locals.chinaInfra ? false)
     locals.me.showChinaVideo = -> locals.chinaInfra ? false
+    locals.me.getProduct = -> product
     str = outFn(locals)
   catch e
     console.log "Compile", filename, basePath
@@ -129,7 +130,7 @@ WebpackStaticStuff.prototype.apply = (compiler) ->
         continue
       @prevTemplates[filename] = content
       chunkPaths = {}
-      compilation.chunks.map (c) ->
+      Array.from(compilation.chunks).map (c) ->
         if c.name
           chunkPaths[c.name] = compiler.options.output.chunkFilename.replace('[name]',c.name).replace('[chunkhash]',c.renderedHash)
 
